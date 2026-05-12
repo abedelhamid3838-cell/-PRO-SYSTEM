@@ -1,0 +1,22 @@
+name: AEGA_CLOUD_ENGINE
+on:
+  schedule:
+    - cron: '0 */2 * * *' # تحديث تلقائي كل ساعتين
+  workflow_dispatch: # زر تشغيل يدوي
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - run: pip install requests
+      - run: python ai_sniper.py
+      - run: |
+          git config --local user.email "bot@aega.com"
+          git config --local user.name "AEGA-BOT"
+          git add playlist.m3u
+          git commit -m "Auto-Update" || exit 0
+          git push
