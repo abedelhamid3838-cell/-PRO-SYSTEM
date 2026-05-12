@@ -1,65 +1,64 @@
 import requests
 import re
-from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 
-# مصادر "خام" يتم تحديثها كل دقيقة (خارج قيتهاب)
-SOURCES = [
-    "https://pastebin.com/raw/866uX6X8", 
-    "https://t.me/s/iptv_links_arabic", # قنص من تلجرام ويب
-    "https://www.telegra.ph/IPTV-Arabic-Free-05-12", # صفحات تليغراف المحدثة
-    "https://raw.githubusercontent.com/tarekzort/IPTV-Daily/main/arabic.m3u",
-    "https://iptv-org.github.io/iptv/countries/ar.m3u"
-]
+# الكلمات المفتاحية للقنص (Target Keywords)
+TARGETS = ["beIN Sports", "OSN", "SSC", "Shahid", "AlKass"]
 
-# الكلمات المفتاحية التي يبحث عنها الـ AI في كامل كود الصفحة
-KEYWORDS = r'beIN|OSN|SSC|Alkass|Shahid|AD_SPORTS'
+# أنماط الروابط (Patterns) التي يبحث عنها الكود في صفحات الويب
+LINK_PATTERN = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
 
-# رأس متصفح "شبح" لتجاوز الحماية (Stealth Mode)
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-}
-
-def validate_stream(name, url):
-    """ فحص جزيئات البث للتأكد من أنه يعمل 100% قبل الحفظ """
-    try:
-        # فحص سريع للرأس (Headers)
-        r = requests.get(url, headers=HEADERS, timeout=4, stream=True)
-        if r.status_code == 200:
-            # التأكد من وجود داتا فيديو فعلياً
-            it = r.iter_content(1024)
-            if next(it): return f"{name}\n{url}\n"
-    except: return None
-
-def deep_web_sniper():
-    found_data = []
-    print("AI Sniper is now searching the entire web...")
-
-    for site in SOURCES:
-        try:
-            response = requests.get(site, headers=HEADERS, timeout=10)
-            # استخراج أي رابط http ينتهي بـ m3u8 أو يحتوي على دفق بيانات
-            # واستخراج اسم القناة الذي يسبقه
-            matches = re.findall(r'(#EXTINF.*?,(.*?)\n(http.*?))', response.text)
-            for full, name, url in matches:
-                if re.search(KEYWORDS, name, re.IGNORECASE):
-                    found_data.append((name.strip(), url.strip()))
-        except: continue
-
-    # تصفية الروابط المكررة
-    unique_data = list(set(found_data))
-    print(f"Found {len(unique_data)} potential links. Starting AI verification...")
-
-    # تشغيل 100 خيط معالجة متوازي (استغلال قوة السحاب)
-    with ThreadPoolExecutor(max_workers=100) as executor:
-        results = list(executor.map(lambda p: validate_stream(p[0], p[1]), unique_data))
+def scan_page(query):
+    """ مسح نتائج محركات البحث لجلب روابط جديدة """
+    found_links = []
+    # محاكاة بحث جوجل أو بينج لجلب صفحات تحتوي على ملفات m3u
+    search_url = f"https://www.bing.com/search?q={query}+filetype:m3u"
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0'}
     
-    # كتابة الملف النهائي
+    try:
+        response = requests.get(search_url, headers=headers, timeout=10)
+        # استخراج جميع الروابط من الصفحة
+        potential_sites = re.findall(LINK_PATTERN, response.text)
+        
+        for site in potential_sites:
+            if "bing" not in site and "microsoft" not in site:
+                try:
+                    # الدخول لكل موقع وجلب محتواه للبحث عن القنوات
+                    content = requests.get(site, headers=headers, timeout=5).text
+                    streams = re.findall(r'(#EXTINF.*)\n(http.*m3u8.*)', content)
+                    for name, url in streams:
+                        if any(t.lower() in name.lower() for t in TARGETS):
+                            found_links.append(f"{name}\n{url.strip()}\n")
+                except: continue
+    except: pass
+    return found_links
+
+def aega_mega_scanner():
+    print("AEGA AI is now scanning the entire web... Please wait.")
+    
+    # استعلامات بحث متقدمة (Dorks)
+    queries = [
+        "index+of+m3u+beIN",
+        "intitle:index.of+m3u8+SSC",
+        "OSN+m3u+playlist+2026",
+        "Shahid+VIP+stream+m3u8"
+    ]
+    
+    all_results = []
+    # استخدام 50 خيط معالجة لمسح الإنترنت بسرعة
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+        futures = [executor.submit(scan_page, q) for q in queries]
+        for future in concurrent.futures.as_completed(futures):
+            all_results.extend(future.result())
+
+    # حفظ النتائج في ملفك
     with open("playlist.m3u", "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
-        final_list = [r for r in results if r is not None]
-        for r in final_list: f.write(r)
-    
-    print(f"Mission Accomplished. {len(final_list)} Live channels secured.")
+        # إزالة التكرار وحفظ الروابط الفريدة
+        for link in list(set(all_results)):
+            f.write(link)
+            
+    print(f"Scan complete. Found {len(set(all_results))} active streams from the open web.")
 
 if __name__ == "__main__":
-    deep_web_sniper()
+    aega_mega_scanner()deep_web_sniper()
