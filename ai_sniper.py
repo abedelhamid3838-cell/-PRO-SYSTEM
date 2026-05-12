@@ -61,4 +61,4 @@ def aega_mega_scanner():
     print(f"Scan complete. Found {len(set(all_results))} active streams from the open web.")
 
 if __name__ == "__main__":
-    aega_mega_scanner()deep_web_sniper()
+    aega_mega_scanner()
